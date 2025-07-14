@@ -1,7 +1,7 @@
 export interface JsonDataItem {
   id: string;
   pageNumber: number;
-  text: string;
+  text?: string;
   bbox: number[];
 }
 
@@ -162,6 +162,13 @@ export interface Size {
   height: number;
 }
 
+export interface TableData {
+  table_cells: TableCell[];
+  num_rows: number;
+  num_cols: number;
+  grid: Grid[][];
+}
+
 export interface Table {
   self_ref: string;
   parent: Parent4;
@@ -172,7 +179,7 @@ export interface Table {
   captions: any[];
   references: any[];
   footnotes: any[];
-  data: Data;
+  data: TableData;
 }
 
 export interface Parent4 {
