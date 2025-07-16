@@ -144,61 +144,32 @@ export default function PdfJsonViewer({
   const documentBlocks: DocumentBlock[] = useMemo(() => {
     const blocks: DocumentBlock[] = [];
 
-    // 임시 변수(현재 처리 중인 단락 저장)
-    let currentParagraph: {
-      id: string;
-      text: string;
-      page: number | null;
-      sourceIds: string[];
-    } | null = null;
-
-    // 현재 단락이 있다면 blocks에 추가하고 초기화
-    const flushParagraph = () => {
-      if (currentParagraph) {
-        blocks.push({
-          ...currentParagraph,
-          type: "paragraph",
-          content: currentParagraph.text,
-        });
-        currentParagraph = null;
-      }
-    };
-
-    // orderedContent를 순회하며 블록 생성
     orderedContent.forEach((item) => {
-      // 그룹 타입은 건너뛰기
       if (item.type === "group") return;
-
-      // 페이지 번호 추출(없으면 null)
       const page = item.data.prov?.[0]?.page_no ?? null;
 
-      if (item.type === "text") {
-        if (item.data.label === "section_header") {
-          flushParagraph();
-          blocks.push({
-            id: item.id, // 블록 ID
-            sourceIds: [item.id], // 원본 ID
-            type: "heading", // 블록 타입
-            content: item.data.text, // 내용
-            page,
-          });
-        } else {
-          if (currentParagraph) {
-            currentParagraph.text += ` ${item.data.text}`;
-            currentParagraph.sourceIds.push(item.id);
-          } else {
-            currentParagraph = {
+      switch (item.type) {
+        case "text":
+          if (item.data.label === "section_header") {
+            blocks.push({
               id: item.id,
-              text: item.data.text,
-              page,
               sourceIds: [item.id],
-            };
+              type: "heading",
+              content: item.data.text,
+              page,
+            });
+          } else {
+            blocks.push({
+              id: item.id,
+              sourceIds: [item.id],
+              type: "paragraph",
+              content: item.data.text,
+              page,
+            });
           }
-        }
-      } else {
-        flushParagraph();
+          break;
 
-        if (item.type === "table") {
+        case "table":
           blocks.push({
             id: item.id,
             sourceIds: [item.id],
@@ -206,7 +177,9 @@ export default function PdfJsonViewer({
             data: item.data,
             page,
           });
-        } else if (item.type === "picture") {
+          break;
+
+        case "picture":
           blocks.push({
             id: item.id,
             sourceIds: [item.id],
@@ -214,13 +187,10 @@ export default function PdfJsonViewer({
             data: item.data,
             page,
           });
-        }
+          break;
       }
     });
-
-    // 마지막 단락 남은 경우 추가
-    flushParagraph();
-    return blocks; // 생성된 블록 반환
+    return blocks;
   }, [orderedContent]);
 
   // PDF 오버레이를 렌더링 위한 bbox 정보 추출
