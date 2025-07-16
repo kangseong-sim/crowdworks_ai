@@ -2,7 +2,6 @@ import React, { useMemo, JSX } from "react";
 import type { TableData } from "../types";
 
 export const TableView = ({ tableData }: { tableData: TableData }) => {
-  
   const tableContent = useMemo(() => {
     if (!tableData?.grid || tableData.grid.length === 0) {
       return (
@@ -30,8 +29,15 @@ export const TableView = ({ tableData }: { tableData: TableData }) => {
 
         occupied[r][c] = true;
 
-        const { row_span, col_span, text, column_header, row_header } =
-          cellData;
+        const {
+          row_span,
+          col_span,
+          text,
+          column_header,
+          row_header,
+          start_row_offset_idx,
+          start_col_offset_idx,
+        } = cellData;
 
         if (row_span > 1 || col_span > 1) {
           for (let ri = 0; ri < row_span; ri++) {
@@ -43,7 +49,14 @@ export const TableView = ({ tableData }: { tableData: TableData }) => {
           }
         }
 
-        const CellComponent = column_header || row_header ? "th" : "td";
+        const isHeader =
+          column_header ||
+          row_header ||
+          start_row_offset_idx === 0 || // 첫 번째 행
+          start_col_offset_idx === 0 || // 첫 번째 열
+          (start_col_offset_idx <= 1 && text !== ""); // 첫 번째나 두 번째 열의 비어있지 않은 셀
+
+        const CellComponent = isHeader ? "th" : "td";
 
         cells.push(
           <CellComponent
