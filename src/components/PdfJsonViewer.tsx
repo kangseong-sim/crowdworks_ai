@@ -11,10 +11,12 @@ import type {
   Text,
   Picture,
   Table,
-  TableData,
   JsonDataItem,
+  OriginalPageDimension,
+  Highlight,
 } from "../types";
 import { TableView } from "./TableView";
+import { PdfView } from "./PdfView";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
@@ -52,10 +54,6 @@ type DocumentBlock =
     };
 
 // 페이지의 원본 크기를 저장하기 위한 타입
-interface OriginalPageDimension {
-  width: number;
-  height: number;
-}
 
 export default function PdfJsonViewer({
   pdfUrl,
@@ -65,6 +63,7 @@ export default function PdfJsonViewer({
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const originalPageDimensions = useRef<(OriginalPageDimension | null)[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [tempSelection, setTempSelection] = useState<Highlight | null>(null);
 
   const pdfContainerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<
@@ -276,6 +275,33 @@ export default function PdfJsonViewer({
     }
   };
 
+  const handleMouseEnterForHighlight = (item: JsonDataItem) => {
+    const originalDim = originalPageDimensions.current[item.pageNumber - 1];
+    if (!originalDim) return;
+
+    const [left, top, right, bottom] = item.bbox;
+    const rect = {
+      left,
+      top: originalDim.height - top,
+      width: right - left,
+      height: top - bottom,
+    };
+
+    setTempSelection({
+      id: `hover-${item.id}`,
+      content: item.text || "",
+      position: { pageNumber: item.pageNumber, rects: [rect] },
+    });
+
+    const blockId = sourceIdToBlockIdMap.get(item.id) || item.id;
+    setActiveId(blockId);
+
+    const jsonEl = itemRefs.current[blockId]?.json;
+    if (jsonEl) {
+      jsonEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  };
+
   useEffect(() => {
     const container = pdfContainerRef.current;
     if (!container) return;
@@ -295,7 +321,7 @@ export default function PdfJsonViewer({
   return (
     <div className="flex w-full h-screen bg-gray-100">
       {/* 왼쪽 PDF 뷰 */}
-      <div
+      {/* <div
         ref={pdfContainerRef}
         className="w-1/2 h-full overflow-auto border-r border-gray-300"
       >
@@ -388,7 +414,23 @@ export default function PdfJsonViewer({
             );
           })}
         </Document>
-      </div>
+      </div> */}
+      <PdfView
+        pdfUrl={pdfUrl}
+        numPages={numPages}
+        onDocumentLoadSuccess={onDocumentLoadSuccess}
+        pdfContainerRef={pdfContainerRef}
+        containerWidth={containerWidth}
+        originalPageDimensions={originalPageDimensions}
+        onPageLoadSuccess={onPageLoadSuccess}
+        allItemsWithBbox={allItemsWithBbox}
+        activeId={activeId}
+        sourceIdToBlockIdMap={sourceIdToBlockIdMap}
+        itemRefs={itemRefs}
+        tempSelection={tempSelection}
+        onItemHover={handleMouseEnterForHighlight}
+        onItemLeave={() => setTempSelection(null)}
+      />
       {/* 오른쪽 JSON 뷰 */}
       <div className="w-1/2 h-full p-6 overflow-auto bg-white">
         <h2 className="pb-2 mb-4 text-2xl font-bold border-b">Json Content</h2>
