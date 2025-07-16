@@ -57,7 +57,6 @@ interface OriginalPageDimension {
   height: number;
 }
 
-
 export default function PdfJsonViewer({
   pdfUrl,
   jsonData,
@@ -296,7 +295,7 @@ export default function PdfJsonViewer({
     const firstSourceId =
       documentBlocks.find((b) => b.id === blockId)?.sourceIds[0] || blockId;
     const pdfElement = itemRefs.current[firstSourceId]?.pdf;
-    
+
     if (pdfElement) {
       pdfElement.scrollIntoView({ behavior: "smooth", block: "center" });
     }
@@ -373,11 +372,19 @@ export default function PdfJsonViewer({
                 >
                   {itemsOnPage.map((item) => {
                     const [left, top, right, bottom] = item.bbox;
+
+                    const PADDING = 4;
+
+                    const rectLeft = left - PADDING;
+                    const rectTop = originalDim.height - (top + PADDING);
+                    const rectWidth = right - left + PADDING * 2;
+                    const rectHeight = top - bottom + PADDING * 2;
+
                     const style: React.CSSProperties = {
-                      left: `${left * scale}px`,
-                      top: `${(originalDim.height - top) * scale}px`,
-                      width: `${(right - left) * scale}px`,
-                      height: `${(top - bottom) * scale}px`,
+                      left: `${rectLeft * scale}px`,
+                      top: `${rectTop * scale}px`,
+                      width: `${rectWidth * scale}px`,
+                      height: `${rectHeight * scale}px`,
                       position: "absolute",
                       pointerEvents: "auto",
                     };
