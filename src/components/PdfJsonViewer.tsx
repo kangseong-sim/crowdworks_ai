@@ -12,6 +12,7 @@ import type {
   Picture,
   Table,
   TableData,
+  JsonDataItem,
 } from "../types";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -171,12 +172,10 @@ export default function PdfJsonViewer({
     return content;
   }, [jsonData]);
 
-  
   // 문서 블록을 생성하는 함수
   const documentBlocks: DocumentBlock[] = useMemo(() => {
-    
     const blocks: DocumentBlock[] = [];
-    
+
     // 임시 변수(현재 처리 중인 단락 저장)
     let currentParagraph: {
       id: string;
@@ -199,14 +198,12 @@ export default function PdfJsonViewer({
 
     // orderedContent를 순회하며 블록 생성
     orderedContent.forEach((item) => {
-
       // 그룹 타입은 건너뛰기
       if (item.type === "group") return;
-      
+
       // 페이지 번호 추출(없으면 null)
       const page = item.data.prov?.[0]?.page_no ?? null;
-      
-      
+
       if (item.type === "text") {
         if (item.data.label === "section_header") {
           flushParagraph();
@@ -232,7 +229,7 @@ export default function PdfJsonViewer({
         }
       } else {
         flushParagraph();
-        
+
         if (item.type === "table") {
           blocks.push({
             id: item.id,
@@ -252,12 +249,41 @@ export default function PdfJsonViewer({
         }
       }
     });
-    
+
     // 마지막 단락 남은 경우 추가
     flushParagraph();
     return blocks; // 생성된 블록 반환
-    
   }, [orderedContent]);
+
+  // 소스 항목들을 순회하며 bbox 정보를 추출
+  const allItemsWithBbox: JsonDataItem[] = useMemo(() => {
+    const items: JsonDataItem[] = [];
+
+    const processItems = (
+      sourceItems: (Text | Picture | Table)[],
+      type: "texts" | "pictures" | "tables"
+    ) => {
+      sourceItems.forEach((item, index) => {
+        if (!item.prov || item.prov.length === 0 || !item.prov[0].bbox) return;
+
+        const prov = item.prov[0];
+        const newItem: JsonDataItem = {
+          id: item.self_ref || `${type}-${index}`,
+          pageNumber: prov.page_no,
+          bbox: [prov.bbox.l, prov.bbox.t, prov.bbox.r, prov.bbox.b], // 좌표 [left, top, right, bottom]
+        };
+
+        if (type === "texts") newItem.text = (item as Text).text;
+        items.push(newItem);
+      });
+    };
+
+    if (jsonData?.texts) processItems(jsonData.texts, "texts");
+    if (jsonData?.pictures) processItems(jsonData.pictures, "pictures");
+    if (jsonData?.tables) processItems(jsonData.tables, "tables");
+
+    return items;
+  }, [jsonData]);
 
   // 페이지 수 설정 핸들러(성공시)
   function onDocumentLoadSuccess({
