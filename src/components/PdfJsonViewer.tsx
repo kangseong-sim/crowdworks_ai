@@ -255,10 +255,11 @@ export default function PdfJsonViewer({
     return blocks; // 생성된 블록 반환
   }, [orderedContent]);
 
-  // 소스 항목들을 순회하며 bbox 정보를 추출
+  // PDF 오버레이를 렌더링 위한 bbox 정보 추출
   const allItemsWithBbox: JsonDataItem[] = useMemo(() => {
     const items: JsonDataItem[] = [];
 
+    // 소스 항목들을 순회하며 bbox 정보를 추출
     const processItems = (
       sourceItems: (Text | Picture | Table)[],
       type: "texts" | "pictures" | "tables"
