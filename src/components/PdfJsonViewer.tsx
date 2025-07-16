@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import {  pdfjs, PageProps } from "react-pdf";
+import { pdfjs, PageProps } from "react-pdf";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -27,6 +27,7 @@ export default function PdfJsonViewer({
   const originalPageDimensions = useRef<(OriginalPageDimension | null)[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [tempSelection, setTempSelection] = useState<Highlight | null>(null);
+  const [, forceUpdate] = useState(0);
 
   const pdfContainerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<
@@ -57,6 +58,8 @@ export default function PdfJsonViewer({
       width: page.originalWidth,
       height: page.originalHeight,
     };
+
+    forceUpdate((c) => c + 1);
   }
 
   const handleItemClick = (id: string): void => {
@@ -119,7 +122,6 @@ export default function PdfJsonViewer({
 
     return () => resizeObserver.disconnect();
   }, []);
-  
 
   return (
     <div className="flex w-full h-screen bg-gray-100">
