@@ -409,26 +409,40 @@ export default function PdfJsonViewer({
                 <div
                   key={key}
                   {...commonProps}
-                  className={`p-2  cursor-pointer ${
+                  className={`p-1 cursor-pointer ${
                     isActive ? "bg-yellow-200" : ""
                   }`}
                 >
-                  <h3 className="text-xl font-semibold text-gray-800">
+                  <h3 className="text-xl font-semibold text-gray-800 text-start">
                     {block.content}
                   </h3>
                 </div>
               );
             case "paragraph":
+              if (block.content.trim().startsWith("*")) {
+                return (
+                  <div
+                    {...commonProps}
+                    className={`p-1 cursor-pointer ${
+                      isActive ? "bg-yellow-200" : ""
+                    }`}
+                  >
+                    <p className="text-xs italic text-gray-600 text-start">
+                      {block.content}
+                    </p>
+                  </div>
+                );
+              }
               return (
                 <div
                   key={key}
                   {...commonProps}
-                  className={`p-2 cursor-pointer ${
+                  className={`p-1 cursor-pointer ${
                     isActive ? "bg-yellow-200" : ""
                   }`}
                 >
                   <p
-                    className={`text-base leading-relaxed text-gray-700 ${
+                    className={`text-sm leading-relaxed text-gray-700 text-start ${
                       isActive ? "bg-yellow-200" : ""
                     }`}
                   >
@@ -447,15 +461,24 @@ export default function PdfJsonViewer({
                 </div>
               );
             case "picture":
+              const imageData = block.data.image;
               return (
                 <div
                   key={key}
                   {...commonProps}
                   className={`p-3 ${isActive ? "bg-yellow-200" : "bg-gray-50"}`}
                 >
-                  <p className="text-sm font-medium text-gray-500">
-                    [IMAGE: {block.data.label || "Untitled"}]
-                  </p>
+                  {imageData?.uri ? (
+                    <img
+                      src={imageData.uri}
+                      alt={block.data.label || `Image ${block.id}`}
+                      className="h-auto max-w-full p-2 mx-auto"
+                    />
+                  ) : (
+                    <p className="text-sm italic font-medium text-gray-500">
+                      [Image not available]
+                    </p>
+                  )}
                 </div>
               );
             default:
