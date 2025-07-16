@@ -14,6 +14,7 @@ import type {
   TableData,
   JsonDataItem,
 } from "../types";
+import { TableView } from "./TableView";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
@@ -56,42 +57,6 @@ interface OriginalPageDimension {
   height: number;
 }
 
-// TableView 컴포넌트
-const TableView = ({ tableData }: { tableData: TableData }) => {
-  if (!tableData?.grid || tableData.grid.length === 0) {
-    return (
-      <p className="mt-2 text-xs text-gray-500">No table data available.</p>
-    );
-  }
-  return (
-    <div className="mt-2 overflow-x-auto border border-gray-300">
-      <table className="min-w-full text-xs bg-white border-collapse">
-        <tbody>
-          {tableData.grid.map((row, rowIndex) => (
-            <tr key={rowIndex} className="border-b border-gray-200">
-              {row.map((cell, cellIndex) => {
-                const CellComponent =
-                  cell.column_header || cell.row_header ? "th" : "td";
-                return (
-                  <CellComponent
-                    key={`${rowIndex}-${cellIndex}`}
-                    rowSpan={cell.row_span > 1 ? cell.row_span : undefined}
-                    colSpan={cell.col_span > 1 ? cell.col_span : undefined}
-                    className={`p-2 border border-gray-200 text-left align-top ${
-                      CellComponent === "th" ? "font-bold bg-gray-50" : ""
-                    }`}
-                  >
-                    {cell.text}
-                  </CellComponent>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-};
 
 export default function PdfJsonViewer({
   pdfUrl,
