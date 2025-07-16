@@ -328,3 +328,25 @@ export type OrderedContentItem =
   | PictureContent
   | TableContent
   | GroupContent;
+
+export interface OriginalPageDimension {
+  width: number;
+  height: number;
+}
+
+export interface HighlightRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+export interface HighlightPosition {
+  pageNumber: number;
+  rects: HighlightRect[];
+}
+export interface Highlight {
+  id: string;
+  content: string;
+  position: HighlightPosition;
+  comment?: string;
+}
