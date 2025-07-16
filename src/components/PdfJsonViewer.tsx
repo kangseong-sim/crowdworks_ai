@@ -103,17 +103,28 @@ export default function PdfJsonViewer({
   const pdfContainerRef = useRef<HTMLDivElement>(null);
 
   const orderedContent: OrderedContentItem[] = useMemo(() => {
+    // 콘텐츠 항목 목록 생성
     const content: OrderedContentItem[] = [];
+
+    // Ref 배열 순회하여 콘텐츠 항목을 생성
     const resolver = (refs: Ref[]) => {
       refs.forEach((refObj) => {
         const parts = refObj.$ref.split("/");
+
         if (parts.length < 3) return;
+
+        // 참조 타입과 인덱스 추출
         const typeKey = parts[1] as keyof Pick<
           JsonData,
           "texts" | "pictures" | "tables" | "groups"
         >;
+
+        // 참조 인덱스 정수 변환
         const index = parseInt(parts[2], 10);
+
         if (isNaN(index)) return;
+
+        // 참조 타입에 따라 jsonData에서 해당 데이터를 찾아 content에 추가
         switch (typeKey) {
           case "texts": {
             const i = jsonData.texts[index];
@@ -153,18 +164,28 @@ export default function PdfJsonViewer({
         }
       });
     };
+
+    // jsonData.body에 children이 있는 경우 최상위 레벨부터 resolver 함수 시작
     if (jsonData?.body?.children) resolver(jsonData.body.children);
+    // 정렬된 콘텐츠 항목을 반환
     return content;
   }, [jsonData]);
 
+  
+  // 문서 블록을 생성하는 함수
   const documentBlocks: DocumentBlock[] = useMemo(() => {
+    
     const blocks: DocumentBlock[] = [];
+    
+    // 임시 변수(현재 처리 중인 단락 저장)
     let currentParagraph: {
       id: string;
       text: string;
       page: number | null;
       sourceIds: string[];
     } | null = null;
+
+    // 현재 단락이 있다면 blocks에 추가하고 초기화
     const flushParagraph = () => {
       if (currentParagraph) {
         blocks.push({
@@ -175,17 +196,25 @@ export default function PdfJsonViewer({
         currentParagraph = null;
       }
     };
+
+    // orderedContent를 순회하며 블록 생성
     orderedContent.forEach((item) => {
+
+      // 그룹 타입은 건너뛰기
       if (item.type === "group") return;
+      
+      // 페이지 번호 추출(없으면 null)
       const page = item.data.prov?.[0]?.page_no ?? null;
+      
+      
       if (item.type === "text") {
         if (item.data.label === "section_header") {
           flushParagraph();
           blocks.push({
-            id: item.id,
-            sourceIds: [item.id],
-            type: "heading",
-            content: item.data.text,
+            id: item.id, // 블록 ID
+            sourceIds: [item.id], // 원본 ID
+            type: "heading", // 블록 타입
+            content: item.data.text, // 내용
             page,
           });
         } else {
@@ -203,6 +232,7 @@ export default function PdfJsonViewer({
         }
       } else {
         flushParagraph();
+        
         if (item.type === "table") {
           blocks.push({
             id: item.id,
@@ -222,8 +252,11 @@ export default function PdfJsonViewer({
         }
       }
     });
+    
+    // 마지막 단락 남은 경우 추가
     flushParagraph();
-    return blocks;
+    return blocks; // 생성된 블록 반환
+    
   }, [orderedContent]);
 
   // 페이지 수 설정 핸들러(성공시)
