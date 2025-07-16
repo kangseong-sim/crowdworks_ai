@@ -100,8 +100,12 @@ export default function PdfJsonViewer({
   const [numPages, setNumPages] = useState<number>(0);
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const originalPageDimensions = useRef<(OriginalPageDimension | null)[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   const pdfContainerRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<
+    Record<string, { pdf: HTMLDivElement | null; json: HTMLDivElement | null }>
+  >({});
 
   const orderedContent: OrderedContentItem[] = useMemo(() => {
     // 콘텐츠 항목 목록 생성
@@ -286,6 +290,17 @@ export default function PdfJsonViewer({
     return items;
   }, [jsonData]);
 
+  // sourceId(json)를 blockId(documentBlocks)로 매핑하는 Map 생성
+  const sourceIdToBlockIdMap = useMemo(() => {
+    const map = new Map<string, string>();
+    documentBlocks.forEach((block) => {
+      block.sourceIds.forEach((sourceId) => {
+        map.set(sourceId, block.id);
+      });
+    });
+    return map;
+  }, [documentBlocks]);
+
   // 페이지 수 설정 핸들러(성공시)
   function onDocumentLoadSuccess({
     numPages: nextNumPages,
@@ -308,6 +323,11 @@ export default function PdfJsonViewer({
       height: page.originalHeight,
     };
   }
+
+  const handleItemClick = (id: string): void => {
+    const blockId = sourceIdToBlockIdMap.get(id) || id;
+    setActiveId(blockId);
+  };
 
   useEffect(() => {
     const container = pdfContainerRef.current;
@@ -333,21 +353,85 @@ export default function PdfJsonViewer({
         className="w-1/2 h-full overflow-auto border-r border-gray-300"
       >
         <Document file={pdfUrl} onLoadSuccess={onDocumentLoadSuccess}>
-          {Array.from({ length: numPages }, (_, index) => (
-            <div
-              key={`page_container_${index + 1}`}
-              className="flex justify-center"
-            >
-              <Page
-                key={`page_${index + 1}`}
-                pageNumber={index + 1}
-                width={containerWidth ? containerWidth : undefined}
-                onLoadSuccess={(page) => onPageLoadSuccess(page, index)}
-                renderTextLayer={false}
-                className="mx-auto mb-4 shadow-lg"
-              />
-            </div>
-          ))}
+          {Array.from({ length: numPages }, (_, index) => {
+            const pageNumber = index + 1;
+            const originalDim = originalPageDimensions.current[index];
+
+            if (!originalDim || containerWidth === 0) {
+              return (
+                <div
+                  key={`page_loader_${pageNumber}`}
+                  className="flex justify-center mb-4"
+                >
+                  <Page
+                    pageNumber={pageNumber}
+                    width={containerWidth}
+                    onLoadSuccess={(page) => onPageLoadSuccess(page, index)}
+                  />
+                </div>
+              );
+            }
+
+            const scale = containerWidth / originalDim.width;
+            const itemsOnPage = allItemsWithBbox.filter(
+              (item) => item.pageNumber === pageNumber
+            );
+
+            return (
+              <div
+                key={`page_wrapper_${pageNumber}`}
+                className="relative mx-auto mb-4 shadow-lg"
+                style={{ width: containerWidth }}
+              >
+                <Page
+                  pageNumber={pageNumber}
+                  scale={scale}
+                  onLoadSuccess={(page) => onPageLoadSuccess(page, index)}
+                  renderTextLayer={false}
+                />
+                <div
+                  className="absolute top-0 left-0 w-full h-full pointer-events-none"
+                  style={{ height: originalDim.height * scale }}
+                >
+                  {itemsOnPage.map((item) => {
+                    const [left, top, right, bottom] = item.bbox;
+                    const style: React.CSSProperties = {
+                      left: `${left * scale}px`,
+                      top: `${(originalDim.height - top) * scale}px`,
+                      width: `${(right - left) * scale}px`,
+                      height: `${(top - bottom) * scale}px`,
+                      position: "absolute",
+                      pointerEvents: "auto",
+                    };
+
+                    const blockId = sourceIdToBlockIdMap.get(item.id);
+                    const isActive = activeId === blockId;
+
+                    return (
+                      <div
+                        key={item.id}
+                        ref={(el) => {
+                          if (!itemRefs.current[item.id])
+                            itemRefs.current[item.id] = {
+                              pdf: null,
+                              json: null,
+                            };
+                          itemRefs.current[item.id].pdf = el;
+                        }}
+                        style={style}
+                        className={`cursor-pointer transition-all duration-200 ${
+                          isActive
+                            ? "bg-blue-500 bg-opacity-30 border-[1px] border-blue-600"
+                            : ""
+                        }`}
+                        onClick={() => handleItemClick(item.id)}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </Document>
       </div>
       {/* 오른쪽 JSON 뷰 */}
