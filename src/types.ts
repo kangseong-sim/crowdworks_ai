@@ -350,3 +350,33 @@ export interface Highlight {
   position: HighlightPosition;
   comment?: string;
 }
+
+export type DocumentBlock =
+  | {
+      id: string;
+      sourceIds: string[];
+      type: "heading";
+      content: string;
+      page: number | null;
+    }
+  | {
+      id: string;
+      sourceIds: string[];
+      type: "paragraph";
+      content: string;
+      page: number | null;
+    }
+  | {
+      id: string;
+      sourceIds: string[];
+      type: "table";
+      data: Table;
+      page: number | null;
+    }
+  | {
+      id: string;
+      sourceIds: string[];
+      type: "picture";
+      data: Picture;
+      page: number | null;
+    };
