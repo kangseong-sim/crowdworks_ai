@@ -327,6 +327,19 @@ export default function PdfJsonViewer({
   const handleItemClick = (id: string): void => {
     const blockId = sourceIdToBlockIdMap.get(id) || id;
     setActiveId(blockId);
+
+    const firstSourceId =
+      documentBlocks.find((b) => b.id === blockId)?.sourceIds[0] || blockId;
+    const pdfElement = itemRefs.current[firstSourceId]?.pdf;
+    
+    if (pdfElement) {
+      pdfElement.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    const jsonEl = itemRefs.current[blockId]?.json;
+    if (jsonEl) {
+      jsonEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
   };
 
   useEffect(() => {
