@@ -37,7 +37,7 @@ export const ContentView: React.FC<ContentViewProps> = ({
               <div
                 key={key}
                 {...commonProps}
-                className={`p-1 cursor-pointer ${
+                className={`my-4 p-1 cursor-pointer ${
                   isActive ? "bg-yellow-200" : ""
                 }`}
               >
