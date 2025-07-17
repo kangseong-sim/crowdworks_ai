@@ -107,6 +107,10 @@ export default function PdfJsonViewer({
     }
   };
 
+  const handleItemLeaveForHighlight = () => {
+    setActiveId(null);
+  };
+
   useEffect(() => {
     const container = pdfContainerRef.current;
     if (!container) return;
@@ -140,7 +144,7 @@ export default function PdfJsonViewer({
         itemRefs={itemRefs}
         tempSelection={tempSelection}
         onItemHover={handleMouseEnterForHighlight}
-        onItemLeave={() => setTempSelection(null)}
+        onItemLeave={handleItemLeaveForHighlight}
       />
       {/* 오른쪽 JSON 뷰 */}
       <ContentView
