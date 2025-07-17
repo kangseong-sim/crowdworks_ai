@@ -1,96 +1,23 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Document, Page, pdfjs, PageProps } from "react-pdf";
+import React, { useState, useEffect, useRef } from "react";
+import { pdfjs, PageProps } from "react-pdf";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import type {
   PdfJsonViewerProps,
-  OrderedContentItem,
-  Data as JsonData,
-  Children as Ref,
-  Text,
-  Picture,
-  Table,
-  TableData,
+  JsonDataItem,
+  OriginalPageDimension,
+  Highlight,
 } from "../types";
+import { PdfView } from "./PdfView";
+import { ContentView } from "./ContentView";
+import { useProcessedPdfData } from "../hooks/useProcessedPdfData";
+import { useDebounce } from "../hooks/useDebounce";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
   import.meta.url
 ).toString();
-
-type DocumentBlock =
-  | {
-      id: string;
-      sourceIds: string[];
-      type: "heading";
-      content: string;
-      page: number | null;
-    }
-  | {
-      id: string;
-      sourceIds: string[];
-      type: "paragraph";
-      content: string;
-      page: number | null;
-    }
-  | {
-      id: string;
-      sourceIds: string[];
-      type: "table";
-      data: Table;
-      page: number | null;
-    }
-  | {
-      id: string;
-      sourceIds: string[];
-      type: "picture";
-      data: Picture;
-      page: number | null;
-    };
-
-// 페이지의 원본 크기를 저장하기 위한 타입
-interface OriginalPageDimension {
-  width: number;
-  height: number;
-}
-
-// TableView 컴포넌트
-const TableView = ({ tableData }: { tableData: TableData }) => {
-  if (!tableData?.grid || tableData.grid.length === 0) {
-    return (
-      <p className="mt-2 text-xs text-gray-500">No table data available.</p>
-    );
-  }
-  return (
-    <div className="mt-2 overflow-x-auto border border-gray-300 rounded-md">
-      <table className="min-w-full text-xs bg-white border-collapse">
-        <tbody>
-          {tableData.grid.map((row, rowIndex) => (
-            <tr key={rowIndex} className="border-b border-gray-200">
-              {row.map((cell, cellIndex) => {
-                const CellComponent =
-                  cell.column_header || cell.row_header ? "th" : "td";
-                return (
-                  <CellComponent
-                    key={`${rowIndex}-${cellIndex}`}
-                    rowSpan={cell.row_span > 1 ? cell.row_span : undefined}
-                    colSpan={cell.col_span > 1 ? cell.col_span : undefined}
-                    className={`p-2 border border-gray-200 text-left align-top ${
-                      CellComponent === "th" ? "font-bold bg-gray-50" : ""
-                    }`}
-                  >
-                    {cell.text}
-                  </CellComponent>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-};
 
 export default function PdfJsonViewer({
   pdfUrl,
@@ -99,165 +26,17 @@ export default function PdfJsonViewer({
   const [numPages, setNumPages] = useState<number>(0);
   const [containerWidth, setContainerWidth] = useState<number>(0);
   const originalPageDimensions = useRef<(OriginalPageDimension | null)[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [tempSelection, setTempSelection] = useState<Highlight | null>(null);
+  const [, forceUpdate] = useState(0);
 
   const pdfContainerRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<
+    Record<string, { pdf: HTMLDivElement | null; json: HTMLDivElement | null }>
+  >({});
 
-  const orderedContent: OrderedContentItem[] = useMemo(() => {
-    // 콘텐츠 항목 목록 생성
-    const content: OrderedContentItem[] = [];
-
-    // Ref 배열 순회하여 콘텐츠 항목을 생성
-    const resolver = (refs: Ref[]) => {
-      refs.forEach((refObj) => {
-        const parts = refObj.$ref.split("/");
-
-        if (parts.length < 3) return;
-
-        // 참조 타입과 인덱스 추출
-        const typeKey = parts[1] as keyof Pick<
-          JsonData,
-          "texts" | "pictures" | "tables" | "groups"
-        >;
-
-        // 참조 인덱스 정수 변환
-        const index = parseInt(parts[2], 10);
-
-        if (isNaN(index)) return;
-
-        // 참조 타입에 따라 jsonData에서 해당 데이터를 찾아 content에 추가
-        switch (typeKey) {
-          case "texts": {
-            const i = jsonData.texts[index];
-            if (i)
-              content.push({
-                id: i.self_ref || `${typeKey}-${index}`,
-                type: "text",
-                data: i,
-              });
-            break;
-          }
-          case "pictures": {
-            const i = jsonData.pictures[index];
-            if (i)
-              content.push({
-                id: i.self_ref || `${typeKey}-${index}`,
-                type: "picture",
-                data: i,
-              });
-            break;
-          }
-          case "tables": {
-            const i = jsonData.tables[index];
-            if (i)
-              content.push({
-                id: i.self_ref || `${typeKey}-${index}`,
-                type: "table",
-                data: i,
-              });
-            break;
-          }
-          case "groups": {
-            const i = jsonData.groups[index];
-            if (i?.children) resolver(i.children);
-            break;
-          }
-        }
-      });
-    };
-
-    // jsonData.body에 children이 있는 경우 최상위 레벨부터 resolver 함수 시작
-    if (jsonData?.body?.children) resolver(jsonData.body.children);
-    // 정렬된 콘텐츠 항목을 반환
-    return content;
-  }, [jsonData]);
-
-  
-  // 문서 블록을 생성하는 함수
-  const documentBlocks: DocumentBlock[] = useMemo(() => {
-    
-    const blocks: DocumentBlock[] = [];
-    
-    // 임시 변수(현재 처리 중인 단락 저장)
-    let currentParagraph: {
-      id: string;
-      text: string;
-      page: number | null;
-      sourceIds: string[];
-    } | null = null;
-
-    // 현재 단락이 있다면 blocks에 추가하고 초기화
-    const flushParagraph = () => {
-      if (currentParagraph) {
-        blocks.push({
-          ...currentParagraph,
-          type: "paragraph",
-          content: currentParagraph.text,
-        });
-        currentParagraph = null;
-      }
-    };
-
-    // orderedContent를 순회하며 블록 생성
-    orderedContent.forEach((item) => {
-
-      // 그룹 타입은 건너뛰기
-      if (item.type === "group") return;
-      
-      // 페이지 번호 추출(없으면 null)
-      const page = item.data.prov?.[0]?.page_no ?? null;
-      
-      
-      if (item.type === "text") {
-        if (item.data.label === "section_header") {
-          flushParagraph();
-          blocks.push({
-            id: item.id, // 블록 ID
-            sourceIds: [item.id], // 원본 ID
-            type: "heading", // 블록 타입
-            content: item.data.text, // 내용
-            page,
-          });
-        } else {
-          if (currentParagraph) {
-            currentParagraph.text += ` ${item.data.text}`;
-            currentParagraph.sourceIds.push(item.id);
-          } else {
-            currentParagraph = {
-              id: item.id,
-              text: item.data.text,
-              page,
-              sourceIds: [item.id],
-            };
-          }
-        }
-      } else {
-        flushParagraph();
-        
-        if (item.type === "table") {
-          blocks.push({
-            id: item.id,
-            sourceIds: [item.id],
-            type: "table",
-            data: item.data,
-            page,
-          });
-        } else if (item.type === "picture") {
-          blocks.push({
-            id: item.id,
-            sourceIds: [item.id],
-            type: "picture",
-            data: item.data,
-            page,
-          });
-        }
-      }
-    });
-    
-    // 마지막 단락 남은 경우 추가
-    flushParagraph();
-    return blocks; // 생성된 블록 반환
-    
-  }, [orderedContent]);
+  const { allItemsWithBbox, documentBlocks, sourceIdToBlockIdMap } =
+    useProcessedPdfData(jsonData);
 
   // 페이지 수 설정 핸들러(성공시)
   function onDocumentLoadSuccess({
@@ -280,7 +59,60 @@ export default function PdfJsonViewer({
       width: page.originalWidth,
       height: page.originalHeight,
     };
+
+    forceUpdate((c) => c + 1);
   }
+
+  const handleItemClick = (id: string): void => {
+    const blockId = sourceIdToBlockIdMap.get(id) || id;
+    setActiveId(blockId);
+
+    const firstSourceId =
+      documentBlocks.find((b) => b.id === blockId)?.sourceIds[0] || blockId;
+    const pdfElement = itemRefs.current[firstSourceId]?.pdf;
+
+    if (pdfElement) {
+      pdfElement.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    const jsonEl = itemRefs.current[blockId]?.json;
+    if (jsonEl) {
+      jsonEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  };
+
+  const handleMouseEnterForHighlight = (item: JsonDataItem) => {
+    const originalDim = originalPageDimensions.current[item.pageNumber - 1];
+    if (!originalDim) return;
+
+    const [left, top, right, bottom] = item.bbox;
+    const rect = {
+      left,
+      top: originalDim.height - top,
+      width: right - left,
+      height: top - bottom,
+    };
+
+    setTempSelection({
+      id: `hover-${item.id}`,
+      content: item.text || "",
+      position: { pageNumber: item.pageNumber, rects: [rect] },
+    });
+
+    const blockId = sourceIdToBlockIdMap.get(item.id) || item.id;
+    setActiveId(blockId);
+
+    const jsonEl = itemRefs.current[blockId]?.json;
+    if (jsonEl) {
+      jsonEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  };
+
+  const handleItemLeaveForHighlight = () => {
+    setActiveId(null);
+  };
+
+  const debouncedContainerWidth = useDebounce(containerWidth, 100);
 
   useEffect(() => {
     const container = pdfContainerRef.current;
@@ -301,72 +133,29 @@ export default function PdfJsonViewer({
   return (
     <div className="flex w-full h-screen bg-gray-100">
       {/* 왼쪽 PDF 뷰 */}
-      <div
-        ref={pdfContainerRef}
-        className="w-1/2 h-full overflow-auto border-r border-gray-300"
-      >
-        <Document file={pdfUrl} onLoadSuccess={onDocumentLoadSuccess}>
-          {Array.from({ length: numPages }, (_, index) => (
-            <div
-              key={`page_container_${index + 1}`}
-              className="flex justify-center"
-            >
-              <Page
-                key={`page_${index + 1}`}
-                pageNumber={index + 1}
-                width={containerWidth ? containerWidth : undefined}
-                onLoadSuccess={(page) => onPageLoadSuccess(page, index)}
-                renderTextLayer={false}
-                className="mx-auto mb-4 shadow-lg"
-              />
-            </div>
-          ))}
-        </Document>
-      </div>
+      <PdfView
+        pdfUrl={pdfUrl}
+        numPages={numPages}
+        onDocumentLoadSuccess={onDocumentLoadSuccess}
+        pdfContainerRef={pdfContainerRef}
+        containerWidth={debouncedContainerWidth}
+        originalPageDimensions={originalPageDimensions}
+        onPageLoadSuccess={onPageLoadSuccess}
+        allItemsWithBbox={allItemsWithBbox}
+        activeId={activeId}
+        sourceIdToBlockIdMap={sourceIdToBlockIdMap}
+        itemRefs={itemRefs}
+        tempSelection={tempSelection}
+        onItemHover={handleMouseEnterForHighlight}
+        onItemLeave={handleItemLeaveForHighlight}
+      />
       {/* 오른쪽 JSON 뷰 */}
-      <div className="w-1/2 h-full p-6 overflow-auto bg-white">
-        <h2 className="pb-2 mb-4 text-2xl font-bold border-b">Json Content</h2>
-        {documentBlocks.map((block) => {
-          const key = block.id;
-          switch (block.type) {
-            case "heading":
-              return (
-                <div key={key} className="p-2 rounded-md">
-                  <h3 className="text-xl font-semibold text-gray-800">
-                    {block.content}
-                  </h3>
-                </div>
-              );
-            case "paragraph":
-              return (
-                <div key={key} className="p-2 rounded-md">
-                  <p className="text-base leading-relaxed text-gray-700">
-                    {block.content}
-                  </p>
-                </div>
-              );
-            case "table":
-              return (
-                <div key={key} className="p-3 rounded-lg bg-gray-50">
-                  <TableView tableData={block.data.data} />
-                </div>
-              );
-            case "picture":
-              return (
-                <div
-                  key={key}
-                  className="p-3 text-center rounded-lg bg-gray-50"
-                >
-                  <p className="text-sm font-medium text-gray-500">
-                    [IMAGE: {block.data.label || "Untitled"}]
-                  </p>
-                </div>
-              );
-            default:
-              return null;
-          }
-        })}
-      </div>
+      <ContentView
+        documentBlocks={documentBlocks}
+        activeId={activeId}
+        itemRefs={itemRefs}
+        onItemClick={handleItemClick}
+      />
     </div>
   );
 }
