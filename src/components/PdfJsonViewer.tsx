@@ -12,6 +12,7 @@ import type {
 import { PdfView } from "./PdfView";
 import { ContentView } from "./ContentView";
 import { useProcessedPdfData } from "../hooks/useProcessedPdfData";
+import { useDebounce } from "../hooks/useDebounce";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
@@ -111,6 +112,8 @@ export default function PdfJsonViewer({
     setActiveId(null);
   };
 
+  const debouncedContainerWidth = useDebounce(containerWidth, 100);
+
   useEffect(() => {
     const container = pdfContainerRef.current;
     if (!container) return;
@@ -135,7 +138,7 @@ export default function PdfJsonViewer({
         numPages={numPages}
         onDocumentLoadSuccess={onDocumentLoadSuccess}
         pdfContainerRef={pdfContainerRef}
-        containerWidth={containerWidth}
+        containerWidth={debouncedContainerWidth}
         originalPageDimensions={originalPageDimensions}
         onPageLoadSuccess={onPageLoadSuccess}
         allItemsWithBbox={allItemsWithBbox}
