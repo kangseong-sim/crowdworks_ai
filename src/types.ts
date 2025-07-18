@@ -46,13 +46,6 @@ export interface Furniture {
   label: string;
 }
 
-//
-
-// {"$ref": "#/texts/0"}: 문서의 본문은 texts 배열의 첫 번째 텍스트 블록으로 시작합니다.
-// {"$ref": "#/pictures/0"}: 그 다음에는 pictures 배열의 첫 번째 그림이 나옵니다.
-// {"$ref": "#/texts/2"}: 이어서 texts 배열의 세 번째 텍스트 블록이 배치됩니다.
-// {"$ref": "#/groups/0"}: 그 다음에는 groups 배열의 첫 번째 그룹 요소가 나타납
-
 export interface Body {
   self_ref: string;
   children: Children[];
@@ -288,15 +281,11 @@ export interface Data {
   groups: Group[];
   texts: Text[];
   pictures: Picture[];
-  tables: Table[]; // <--- 이제 이 `Table` 타입은 `TableData`를 올바르게 참조합니다.
+  tables: Table[];
   key_value_items: any[];
   form_items: any[];
   pages: Pages;
 }
-
-// ===================================================================
-// [개선] OrderedContentItem을 '판별된 유니온' 타입으로 재정의
-// ===================================================================
 
 interface TextContent {
   id: string;
@@ -322,12 +311,12 @@ interface GroupContent {
   data: Group;
 }
 
-// 최종적으로 사용할 콘텐츠 아이템 타입
 export type OrderedContentItem =
   | TextContent
   | PictureContent
   | TableContent
-  | GroupContent;
+  | GroupContent
+  | { id: string; type: string; data: any };
 
 export interface OriginalPageDimension {
   width: number;
@@ -378,5 +367,13 @@ export type DocumentBlock =
       sourceIds: string[];
       type: "picture";
       data: Picture;
+      page: number | null;
+    }
+  | {
+      id: string;
+      sourceIds: string[];
+      type: "unknown";
+      content?: string;
+      data: any;
       page: number | null;
     };
