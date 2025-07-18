@@ -159,6 +159,20 @@ export function useProcessedPdfData(jsonData: JsonData) {
             page,
           });
           break;
+
+        default:
+          blocks.push({
+            id: item.id,
+            sourceIds: [item.id],
+            type: "unknown",
+            content:
+              item.data?.text ||
+              JSON.stringify(item.data) ||
+              `Unknown type: ${item.type}`,
+            data: item.data,
+            page,
+          });
+          break;
       }
     });
     return blocks;
